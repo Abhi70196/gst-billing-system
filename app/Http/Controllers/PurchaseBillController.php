@@ -28,12 +28,12 @@ class PurchaseBillController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'vendor_id'          => 'required|exists:vendors,id',
-            'vendor_bill_number' => 'nullable|string',
-            'date'               => 'required|date',
-            'due_date'           => 'nullable|date|after_or_equal:date',
-            'notes'              => 'nullable|string',
-            'items'              => 'required|array|min:1',
+            'vendor_id'            => 'required|exists:vendors,id',
+            'vendor_bill_number'   => 'nullable|string',
+            'date'                 => 'required|date',
+            'due_date'             => 'nullable|date|after_or_equal:date',
+            'notes'                => 'nullable|string',
+            'items'                => 'required|array|min:1',
             'items.*.product_name' => 'required|string',
             'items.*.quantity'     => 'required|numeric|min:0',
             'items.*.unit_price'   => 'required|numeric|min:0',
@@ -45,13 +45,22 @@ class PurchaseBillController extends Controller
 
         DB::beginTransaction();
         try {
-            $subtotal = 0; $totalCgst = 0; $totalSgst = 0; $totalIgst = 0;
+            $subtotal  = 0;
+            $totalCgst = 0;
+            $totalSgst = 0;
+            $totalIgst = 0;
             $processedItems = [];
 
             foreach ($data['items'] as $item) {
                 $discount      = $item['discount'] ?? 0;
                 $taxableAmount = $item['quantity'] * $item['unit_price'] * (1 - $discount / 100);
-                $gst           = $this->gstService->calculate($taxableAmount, $item['gst_rate']);
+
+                $gst = $this->gstService->calculate(
+                    $taxableAmount,
+                    $item['gst_rate'],
+                    0,
+                    'intra'
+                );
 
                 $processedItems[] = array_merge($item, [
                     'taxable_amount' => $taxableAmount,
@@ -61,7 +70,7 @@ class PurchaseBillController extends Controller
                     'cgst_amount'    => $gst['cgst_amount'],
                     'sgst_amount'    => $gst['sgst_amount'],
                     'igst_amount'    => $gst['igst_amount'],
-                    'total_amount'   => $taxableAmount + $gst['total_gst'],
+                    'total_amount'   => $gst['total'],
                 ]);
 
                 $subtotal  += $taxableAmount;
@@ -93,6 +102,7 @@ class PurchaseBillController extends Controller
 
             DB::commit();
             return response()->json($bill->load('items'), 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -116,7 +126,7 @@ class PurchaseBillController extends Controller
         if (isset($data['paid_amount'])) {
             $data['balance_due'] = $purchaseBill->total_amount - $data['paid_amount'];
             if ($data['balance_due'] <= 0) {
-                $data['status'] = 'paid';
+                $data['status']    = 'paid';
                 $data['balance_due'] = 0;
             } elseif ($data['paid_amount'] > 0) {
                 $data['status'] = 'partial';
@@ -131,5 +141,32 @@ class PurchaseBillController extends Controller
     {
         $purchaseBill->update(['status' => 'cancelled']);
         return response()->json(['message' => 'Purchase bill cancelled']);
+    }
+
+    public function recordPayment(Request $request, PurchaseBill $purchaseBill)
+    {
+        $data = $request->validate([
+            'amount'       => 'required|numeric|min:0.01',
+            'payment_mode' => 'required|in:cash,upi,bank,cheque,other',
+            'payment_date' => 'required|date',
+            'reference_no' => 'nullable|string',
+            'remarks'      => 'nullable|string',
+        ]);
+
+        $newPaid = $purchaseBill->paid_amount + $data['amount'];
+        $balance = $purchaseBill->total_amount - $newPaid;
+
+        $purchaseBill->update([
+            'paid_amount' => $newPaid,
+            'balance_due' => max(0, $balance),
+            'status'      => $balance <= 0 ? 'paid' : 'partial',
+        ]);
+
+        return response()->json([
+            'message'     => 'Payment recorded successfully.',
+            'paid_amount' => $newPaid,
+            'balance_due' => max(0, $balance),
+            'status'      => $purchaseBill->status,
+        ]);
     }
 }

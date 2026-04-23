@@ -46,6 +46,33 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::patch('/recurring-invoices/{recurringInvoice}/pause',
         [RecurringInvoiceController::class, 'pause']);
 
+    // ── MEMBER 2 ROUTES ──
+    // Vendors
+    Route::apiResource('/vendors', \App\Http\Controllers\VendorController::class);
+
+    // Purchase Bills
+    Route::apiResource('/purchase-bills', \App\Http\Controllers\PurchaseBillController::class);
+    Route::post('/purchase-bills/{bill}/payments', [\App\Http\Controllers\PurchaseBillController::class, 'recordPayment']);
+
+    // Proforma Invoices
+    Route::apiResource('/proforma-invoices', \App\Http\Controllers\ProformaInvoiceController::class);
+    Route::post('/proforma-invoices/{proforma}/convert', [\App\Http\Controllers\ProformaInvoiceController::class, 'convert']);
+
+    // Bills of Supply
+    Route::apiResource('/bills-of-supply', \App\Http\Controllers\BillOfSupplyController::class);
+
+    // Delivery Challans
+    Route::apiResource('/delivery-challans', \App\Http\Controllers\DeliveryChallanController::class);
+    Route::post('/delivery-challans/{challan}/convert', [\App\Http\Controllers\DeliveryChallanController::class, 'convert']);
+
+    // Credit Notes
+    Route::get('/credit-notes', [\App\Http\Controllers\CreditNoteController::class, 'index']);
+    Route::post('/invoices/{invoice}/credit-notes', [\App\Http\Controllers\CreditNoteController::class, 'store']);
+
+    // Debit Notes
+    Route::get('/debit-notes', [\App\Http\Controllers\DebitNoteController::class, 'index']);
+    Route::post('/invoices/{invoice}/debit-notes', [\App\Http\Controllers\DebitNoteController::class, 'store']);
+
     // ── DASHBOARD ──
     Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
 
