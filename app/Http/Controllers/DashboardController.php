@@ -32,11 +32,10 @@ class DashboardController extends Controller
             ->first();
 
         // ITC for the month
-        $itc = PurchaseBill::whereBetween('bill_date', [$start, $end])
-            ->where('itc_eligible', true)
-            ->selectRaw('SUM(cgst_total + sgst_total + igst_total) as total_itc')
+        $itc = PurchaseBill::whereBetween('date', [$start, $end])
+            ->selectRaw('SUM(cgst_amount + sgst_amount + igst_amount) as total_itc')
             ->first();
-
+            
         // Top 5 customers by sales
         $topCustomers = Invoice::with('customer')
             ->whereBetween('invoice_date', [$start, $end])

@@ -4,16 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\PurchaseBill;
-use App\Models\Payment;
 use App\Exports\GstSummaryExport;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-    /** GET /reports/gst-summary?month=2026-04&format=xlsx */
     public function gstSummary(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -43,7 +40,6 @@ class ReportController extends Controller
         return response()->json($data);
     }
 
-    /** GET /reports/gstr-3b-summary?month=2026-04 */
     public function gstr3bSummary(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -54,11 +50,12 @@ class ReportController extends Controller
             ->where('is_export', false)
             ->where('status', '!=', 'cancelled')
             ->where('status', '!=', 'draft')
-            ->selectRaw('SUM(subtotal) as taxable,
-                         SUM(cgst_total) as cgst,
-                         SUM(sgst_total) as sgst,
-                         SUM(igst_total) as igst')
-            ->first();
+            ->selectRaw('
+                SUM(subtotal)    as taxable,
+                SUM(cgst_total)  as cgst,
+                SUM(sgst_total)  as sgst,
+                SUM(igst_total)  as igst
+            ')->first();
 
         $zeroRated = Invoice::whereBetween('invoice_date', [$start, $end])
             ->where('is_export', true)
@@ -67,16 +64,17 @@ class ReportController extends Controller
 
         $rcm = Invoice::whereBetween('invoice_date', [$start, $end])
             ->where('reverse_charge', true)
-            ->selectRaw('SUM(subtotal) as taxable,
-                         SUM(igst_total) as igst')
-            ->first();
+            ->selectRaw('
+                SUM(subtotal)   as taxable,
+                SUM(igst_total) as igst
+            ')->first();
 
-        $itc = PurchaseBill::whereBetween('bill_date', [$start, $end])
-            ->where('itc_eligible', true)
-            ->selectRaw('SUM(cgst_total) as cgst,
-                         SUM(sgst_total) as sgst,
-                         SUM(igst_total) as igst')
-            ->first();
+        $itc = PurchaseBill::whereBetween('date', [$start, $end])
+            ->selectRaw('
+                SUM(cgst_amount) as cgst,
+                SUM(sgst_amount) as sgst,
+                SUM(igst_amount) as igst
+            ')->first();
 
         return response()->json([
             'period'    => $month,
@@ -87,25 +85,21 @@ class ReportController extends Controller
         ]);
     }
 
-    /** GET /reports/itc-summary?month=2026-04 */
     public function itcSummary(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
         $start = Carbon::parse($month)->startOfMonth();
         $end   = Carbon::parse($month)->endOfMonth();
 
-        $eligible = PurchaseBill::whereBetween('bill_date', [$start, $end])
-            ->where('itc_eligible', true)
-            ->selectRaw('SUM(cgst_total) as cgst,
-                         SUM(sgst_total) as sgst,
-                         SUM(igst_total) as igst,
-                         SUM(total_amount) as total')
-            ->first();
+        $eligible = PurchaseBill::whereBetween('date', [$start, $end])
+            ->selectRaw('
+                SUM(cgst_amount) as cgst,
+                SUM(sgst_amount) as sgst,
+                SUM(igst_amount) as igst,
+                SUM(total_amount) as total
+            ')->first();
 
-        $blocked = PurchaseBill::whereBetween('bill_date', [$start, $end])
-            ->where('itc_eligible', false)
-            ->selectRaw('SUM(total_amount) as total')
-            ->first();
+        $blocked = ['total' => 0];
 
         return response()->json([
             'eligible' => $eligible,
@@ -114,10 +108,9 @@ class ReportController extends Controller
         ]);
     }
 
-    /** GET /reports/pending-payments */
     public function pendingPayments(Request $request)
     {
-        $invoices = Invoice::whereIn('status', ['finalised','partial'])
+        $invoices = Invoice::whereIn('status', ['finalised', 'partial'])
             ->with('customer')
             ->selectRaw('*,
                 DATEDIFF(CURDATE(), due_date) as days_overdue,
@@ -132,7 +125,6 @@ class ReportController extends Controller
         return response()->json($invoices);
     }
 
-    /** GET /reports/sales */
     public function sales(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
@@ -140,14 +132,13 @@ class ReportController extends Controller
         $end   = Carbon::parse($month)->endOfMonth();
 
         $sales = Invoice::whereBetween('invoice_date', [$start, $end])
-            ->whereNotIn('status', ['draft','cancelled'])
+            ->whereNotIn('status', ['draft', 'cancelled'])
             ->with('customer')
             ->get();
 
         return response()->json($sales);
     }
 
-    /** GET /reports/customer-ledger */
     public function customerLedger(Request $request)
     {
         $request->validate([
@@ -155,7 +146,7 @@ class ReportController extends Controller
         ]);
 
         $invoices = Invoice::where('customer_id', $request->customer_id)
-            ->whereNotIn('status', ['draft','cancelled'])
+            ->whereNotIn('status', ['draft', 'cancelled'])
             ->with('payments')
             ->orderBy('invoice_date')
             ->get();
