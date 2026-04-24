@@ -25,33 +25,39 @@ class CreditNoteController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'invoice_id'  => 'required|exists:invoices,id',
-            'customer_id' => 'required|exists:customers,id',
-            'date'        => 'required|date',
-            'reason'      => 'nullable|string',
-            'notes'       => 'nullable|string',
-            'items'       => 'required|array|min:1',
-            'items.*.product_name'   => 'required|string',
-            'items.*.quantity'       => 'required|numeric|min:0',
-            'items.*.unit_price'     => 'required|numeric|min:0',
-            'items.*.gst_rate'       => 'required|numeric|min:0',
-            'items.*.discount'       => 'nullable|numeric|min:0|max:100',
-            'items.*.hsn_sac'        => 'nullable|string',
-            'items.*.description'    => 'nullable|string',
+            'invoice_id'           => 'required|exists:invoices,id',
+            'customer_id'          => 'required|exists:customers,id',
+            'date'                 => 'required|date',
+            'reason'               => 'nullable|string',
+            'notes'                => 'nullable|string',
+            'items'                => 'required|array|min:1',
+            'items.*.product_name' => 'required|string',
+            'items.*.quantity'     => 'required|numeric|min:0',
+            'items.*.unit_price'   => 'required|numeric|min:0',
+            'items.*.gst_rate'     => 'required|numeric|min:0',
+            'items.*.discount'     => 'nullable|numeric|min:0|max:100',
+            'items.*.hsn_sac'      => 'nullable|string',
+            'items.*.description'  => 'nullable|string',
         ]);
 
         DB::beginTransaction();
         try {
-            $subtotal = 0;
+            $subtotal  = 0;
             $totalCgst = 0;
             $totalSgst = 0;
             $totalIgst = 0;
-
             $processedItems = [];
+
             foreach ($data['items'] as $item) {
                 $discount      = $item['discount'] ?? 0;
                 $taxableAmount = $item['quantity'] * $item['unit_price'] * (1 - $discount / 100);
-                $gst           = $this->gstService->calculate($taxableAmount, $item['gst_rate']);
+
+                $gst = $this->gstService->calculate(
+                    $taxableAmount,
+                    $item['gst_rate'],
+                    0,
+                    'intra'
+                );
 
                 $processedItems[] = array_merge($item, [
                     'taxable_amount' => $taxableAmount,
@@ -61,13 +67,13 @@ class CreditNoteController extends Controller
                     'cgst_amount'    => $gst['cgst_amount'],
                     'sgst_amount'    => $gst['sgst_amount'],
                     'igst_amount'    => $gst['igst_amount'],
-                    'total_amount'   => $taxableAmount + $gst['total_gst'],
+                    'total_amount'   => $gst['total'],
                 ]);
 
-                $subtotal   += $taxableAmount;
-                $totalCgst  += $gst['cgst_amount'];
-                $totalSgst  += $gst['sgst_amount'];
-                $totalIgst  += $gst['igst_amount'];
+                $subtotal  += $taxableAmount;
+                $totalCgst += $gst['cgst_amount'];
+                $totalSgst += $gst['sgst_amount'];
+                $totalIgst += $gst['igst_amount'];
             }
 
             $creditNote = CreditNote::create([
@@ -89,6 +95,7 @@ class CreditNoteController extends Controller
 
             DB::commit();
             return response()->json($creditNote->load('items'), 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);

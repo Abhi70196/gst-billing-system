@@ -28,12 +28,12 @@ class ProformaInvoiceController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'customer_id'       => 'required|exists:customers,id',
-            'date'              => 'required|date',
-            'valid_until'       => 'nullable|date|after_or_equal:date',
-            'terms_conditions'  => 'nullable|string',
-            'notes'             => 'nullable|string',
-            'items'             => 'required|array|min:1',
+            'customer_id'          => 'required|exists:customers,id',
+            'date'                 => 'required|date',
+            'valid_until'          => 'nullable|date|after_or_equal:date',
+            'terms_conditions'     => 'nullable|string',
+            'notes'                => 'nullable|string',
+            'items'                => 'required|array|min:1',
             'items.*.product_name' => 'required|string',
             'items.*.quantity'     => 'required|numeric|min:0',
             'items.*.unit_price'   => 'required|numeric|min:0',
@@ -45,13 +45,22 @@ class ProformaInvoiceController extends Controller
 
         DB::beginTransaction();
         try {
-            $subtotal = 0; $totalCgst = 0; $totalSgst = 0; $totalIgst = 0;
+            $subtotal  = 0;
+            $totalCgst = 0;
+            $totalSgst = 0;
+            $totalIgst = 0;
             $processedItems = [];
 
             foreach ($data['items'] as $item) {
                 $discount      = $item['discount'] ?? 0;
                 $taxableAmount = $item['quantity'] * $item['unit_price'] * (1 - $discount / 100);
-                $gst           = $this->gstService->calculate($taxableAmount, $item['gst_rate']);
+
+                $gst = $this->gstService->calculate(
+                    $taxableAmount,
+                    $item['gst_rate'],
+                    0,
+                    'intra'
+                );
 
                 $processedItems[] = array_merge($item, [
                     'taxable_amount' => $taxableAmount,
@@ -61,7 +70,7 @@ class ProformaInvoiceController extends Controller
                     'cgst_amount'    => $gst['cgst_amount'],
                     'sgst_amount'    => $gst['sgst_amount'],
                     'igst_amount'    => $gst['igst_amount'],
-                    'total_amount'   => $taxableAmount + $gst['total_gst'],
+                    'total_amount'   => $gst['total'],
                 ]);
 
                 $subtotal  += $taxableAmount;
@@ -71,24 +80,25 @@ class ProformaInvoiceController extends Controller
             }
 
             $proforma = ProformaInvoice::create([
-                'proforma_number'   => $this->generateNumber(),
-                'customer_id'       => $data['customer_id'],
-                'date'              => $data['date'],
-                'valid_until'       => $data['valid_until'] ?? null,
-                'terms_conditions'  => $data['terms_conditions'] ?? null,
-                'notes'             => $data['notes'] ?? null,
-                'subtotal'          => $subtotal,
-                'cgst_amount'       => $totalCgst,
-                'sgst_amount'       => $totalSgst,
-                'igst_amount'       => $totalIgst,
-                'total_amount'      => $subtotal + $totalCgst + $totalSgst + $totalIgst,
-                'status'            => 'draft',
+                'proforma_number'  => $this->generateNumber(),
+                'customer_id'      => $data['customer_id'],
+                'date'             => $data['date'],
+                'valid_until'      => $data['valid_until'] ?? null,
+                'terms_conditions' => $data['terms_conditions'] ?? null,
+                'notes'            => $data['notes'] ?? null,
+                'subtotal'         => $subtotal,
+                'cgst_amount'      => $totalCgst,
+                'sgst_amount'      => $totalSgst,
+                'igst_amount'      => $totalIgst,
+                'total_amount'     => $subtotal + $totalCgst + $totalSgst + $totalIgst,
+                'status'           => 'draft',
             ]);
 
             $proforma->items()->createMany($processedItems);
 
             DB::commit();
             return response()->json($proforma->load('items'), 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -118,5 +128,19 @@ class ProformaInvoiceController extends Controller
     {
         $proformaInvoice->update(['status' => 'cancelled']);
         return response()->json(['message' => 'Proforma invoice cancelled']);
+    }
+
+    public function convert(ProformaInvoice $proformaInvoice)
+    {
+        if ($proformaInvoice->status === 'converted') {
+            return response()->json(['message' => 'Already converted to invoice'], 400);
+        }
+
+        $proformaInvoice->update(['status' => 'converted']);
+
+        return response()->json([
+            'message'  => 'Proforma invoice marked as converted',
+            'proforma' => $proformaInvoice
+        ]);
     }
 }
