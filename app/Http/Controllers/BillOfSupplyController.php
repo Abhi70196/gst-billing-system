@@ -49,7 +49,16 @@ class BillOfSupplyController extends Controller
                 $itemTotal   = $item['quantity'] * $item['unit_price'] * (1 - $discount / 100);
                 $totalAmount += $itemTotal;
 
-                $processedItems[] = array_merge($item, ['total_amount' => $itemTotal]);
+               $processedItems[] = [
+    'product_name' => $item['product_name'],
+    'hsn_sac'      => $item['hsn_sac'] ?? null,
+    'description'  => $item['description'] ?? null,
+    'quantity'     => $item['quantity'],
+    'unit'         => $item['unit'] ?? null,
+    'unit_price'   => $item['unit_price'],
+    'discount'     => $item['discount'] ?? 0,
+    'total_amount' => round($itemTotal, 2),
+];
             }
 
             $bill = BillOfSupply::create([

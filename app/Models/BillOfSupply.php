@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class BillOfSupply extends Model
 {
+    protected $table = 'bills_of_supply';
     protected $fillable = [
         'bill_number', 'customer_id', 'date', 'total_amount',
         'status', 'supply_type', 'terms_conditions', 'notes'

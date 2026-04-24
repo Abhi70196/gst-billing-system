@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseBillItem extends Model
 {
+    protected $table = 'purchase_bill_items';
     protected $fillable = [
         'purchase_bill_id', 'product_name', 'hsn_sac', 'description',
         'quantity', 'unit', 'unit_price', 'discount', 'taxable_amount',
