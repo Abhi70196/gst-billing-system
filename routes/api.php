@@ -66,3 +66,20 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
 });
+use App\Http\Controllers\VendorController;
+use App\Http\Controllers\CreditNoteController;
+use App\Http\Controllers\DebitNoteController;
+use App\Http\Controllers\ProformaInvoiceController;
+use App\Http\Controllers\BillOfSupplyController;
+use App\Http\Controllers\DeliveryChallanController;
+use App\Http\Controllers\PurchaseBillController;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('vendors',            VendorController::class);
+    Route::apiResource('credit-notes',       CreditNoteController::class);
+    Route::apiResource('debit-notes',        DebitNoteController::class);
+    Route::apiResource('proforma-invoices',  ProformaInvoiceController::class);
+    Route::apiResource('bills-of-supply',    BillOfSupplyController::class);
+    Route::apiResource('delivery-challans',  DeliveryChallanController::class);
+    Route::apiResource('purchase-bills',     PurchaseBillController::class);
+});

@@ -47,8 +47,7 @@ class DebitNoteController extends Controller
             foreach ($data['items'] as $item) {
                 $discount      = $item['discount'] ?? 0;
                 $taxableAmount = $item['quantity'] * $item['unit_price'] * (1 - $discount / 100);
-                $gst           = $this->gstService->calculate($taxableAmount, $item['gst_rate']);
-
+               $gst = $this->gstService->calculate($taxableAmount, $item['gst_rate'], 0, 'intra');
                 $processedItems[] = array_merge($item, [
                     'taxable_amount' => $taxableAmount,
                     'cgst_rate'      => $gst['cgst_rate'],
@@ -57,7 +56,7 @@ class DebitNoteController extends Controller
                     'cgst_amount'    => $gst['cgst_amount'],
                     'sgst_amount'    => $gst['sgst_amount'],
                     'igst_amount'    => $gst['igst_amount'],
-                    'total_amount'   => $taxableAmount + $gst['total_gst'],
+                    'total_amount'   => $gst['total'],
                 ]);
 
                 $subtotal  += $taxableAmount;
