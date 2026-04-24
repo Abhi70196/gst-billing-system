@@ -11,7 +11,6 @@ class RecurringInvoiceController extends Controller
     public function index()
     {
         $recurring = RecurringInvoice::with('customer')
-            ->where('created_by', auth()->id())
             ->get();
 
         return response()->json($recurring);
