@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PdfGenerationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Customer;
@@ -138,5 +140,59 @@ class InvoiceController extends Controller
         $invoice->save();
 
         return response()->json($invoice);
+    }
+
+    public function update(Request $request, Invoice $invoice)
+    {
+        if ($invoice->finalised_at) {
+            return response()->json(['message' => 'Cannot update a finalised invoice.'], 403);
+        }
+
+        $request->validate([
+            'notes'            => 'nullable|string|max:1000',
+            'due_date'         => 'nullable|date',
+            'invoice_template' => 'nullable|string',
+        ]);
+
+        $invoice->update($request->only(['notes', 'due_date', 'invoice_template']));
+        return response()->json($invoice);
+    }
+
+    public function pdf(Invoice $invoice)
+    {
+        try {
+            $invoice->load('items', 'customer', 'payments');
+
+            $templateMap = [
+                'template_classic' => 'pdf.invoice_classic',
+                'template_modern'  => 'pdf.invoice_modern',
+                'template_compact' => 'pdf.invoice_compact',
+                'template_elegant' => 'pdf.invoice_elegant',
+            ];
+
+            $view = $templateMap[$invoice->invoice_template] 
+                ?? 'pdf.invoice_classic';
+
+            $pdf = Pdf::loadView($view, [
+                'invoice' => $invoice,
+                'company' => [
+                    'name'       => config('company.name', 'Your Company'),
+                    'address'    => config('company.address', 'Company Address'),
+                    'gstin'      => config('company.gstin', 'GSTIN HERE'),
+                    'phone'      => config('company.phone', ''),
+                    'email'      => config('company.email', ''),
+                    'state_code' => config('company.state_code', '27'),
+                ]
+            ]);
+
+            $filename = 'invoice_' . ($invoice->invoice_number ?? $invoice->id) . '.pdf';
+
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'PDF generation failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
