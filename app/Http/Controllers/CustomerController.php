@@ -9,9 +9,11 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        return response()->json(Customer::all());
+        $customers = Customer::withCount('invoices')
+            ->latest()
+            ->get();
+        return response()->json($customers);
     }
-
     public function store(Request $request)
     {
         $request->validate([

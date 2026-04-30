@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\BulkInvoiceController;
 use App\Http\Controllers\RecurringInvoiceController;
+use App\Http\Controllers\InvoiceEmailController;
 
 // ── PUBLIC ROUTES ──
 Route::middleware(['throttle:5,1'])
@@ -35,6 +36,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/invoices/{invoice}/finalise',[InvoiceController::class, 'finalise']);
     Route::get('/invoices/{invoice}/pdf',      [InvoiceController::class, 'pdf']);
     Route::post('/invoices/{invoice}/payments',[PaymentController::class, 'store']);
+
+    // Email routes
+    Route::post('/invoices/{invoice}/send-email', [InvoiceEmailController::class, 'sendInvoice']);
+    Route::post('/invoices/{invoice}/send-reminder', [InvoiceEmailController::class, 'sendReminder']);
+    Route::post('/invoices/{invoice}/send-payment-confirmation', [InvoiceEmailController::class, 'sendPaymentConfirmation']);
 
     // ── BULK OPERATIONS ──
     Route::post('/invoices/bulk-pdf',    [BulkInvoiceController::class, 'bulkPdf']);

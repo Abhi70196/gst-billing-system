@@ -9,7 +9,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class PaymentReminderMail extends Mailable
+class PaymentReceivedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
@@ -18,13 +18,13 @@ class PaymentReminderMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Payment Reminder — Invoice ' . $this->invoice->invoice_number,
+            subject: 'Payment Received — Invoice ' . $this->invoice->invoice_number,
         );
     }
 
     public function content(): Content
     {
-        return new Content(view: 'emails.payment-reminder');
+        return new Content(view: 'emails.payment-received');
     }
 
     public function attachments(): array { return []; }

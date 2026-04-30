@@ -20,9 +20,10 @@ class PurchaseBillController extends Controller
 
     public function index()
     {
-        return response()->json(
-            PurchaseBill::with(['vendor', 'items'])->latest()->get()
-        );
+        $bills = PurchaseBill::with(['vendor', 'items.product'])
+            ->latest()
+            ->get();
+        return response()->json($bills);
     }
 
     public function store(Request $request)

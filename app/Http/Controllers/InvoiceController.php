@@ -21,9 +21,8 @@ class InvoiceController extends Controller
 
     public function index()
     {
-        return response()->json(
-            Invoice::with('customer', 'items')->latest()->get()
-        );
+        $invoices = Invoice::with(['customer', 'items'])->latest()->get();
+        return response()->json($invoices);
     }
 
     public function store(Request $request)

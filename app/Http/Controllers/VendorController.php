@@ -9,9 +9,12 @@ class VendorController extends Controller
 {
     public function index()
     {
-        return response()->json(Vendor::where('is_active', true)->latest()->get());
+        $vendors = Vendor::withCount('purchaseBills')
+            ->latest()
+            ->get();
+        return response()->json($vendors);
     }
-
+    
     public function store(Request $request)
     {
         $data = $request->validate([
